@@ -20,7 +20,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Network)
+find_package(QT NAMES Qt6 REQUIRED COMPONENTS Widgets Network)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network)
 
 set(PROJECT_SOURCES
@@ -39,21 +39,13 @@ set(PROJECT_SOURCES
         clickablelabel.h
 )
 
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(gs4ps2qt
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
-    )
-else()
-        add_executable(gs4ps2qt
-            ${PROJECT_SOURCES}
-        )
-endif()
+qt_add_executable(gs4ps2qt MANUAL_FINALIZATION ${PROJECT_SOURCES})
+
 
 target_include_directories(gs4ps2qt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sockpp/include)
 target_link_libraries(gs4ps2qt PRIVATE ${SOCKPP_LIB})
 
-target_link_libraries(gs4ps2qt PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
+target_link_libraries(gs4ps2qt PRIVATE Qt6::Widgets Qt6::Network)
 
 
 set_target_properties(gs4ps2qt PROPERTIES
