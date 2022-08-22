@@ -47,11 +47,6 @@ public:
 		Freeze,
 		Unknown
 	};
-
-	static GSDumpInstruction ParseInstruction(QDataStream& data)
-	{
-		
-	}
 	
 	static GSDumpHeader ReadHeader(QDataStream& data);
 };

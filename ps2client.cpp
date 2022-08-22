@@ -42,6 +42,7 @@ void PS2ClientWorker::connectSocket(QString hostname)
 void PS2ClientWorker::cmdExecuteDump(QByteArray data)
 {
 	init_crc8();
+	shutdownFlag = false;
 
 	QDataStream ds(data);
 	ds.setByteOrder(QDataStream::LittleEndian);
@@ -114,6 +115,8 @@ _startTransfers:
 	bool transKicked = false;
 	do
 	{
+		if(shutdownFlag)
+			break;
 		// We don't have any peeking with QDataStream
 		// So when we kick we will have read the next tag
 		if (!transKicked)
@@ -244,7 +247,7 @@ _startTransfers:
 		}
 	} while (!ds.atEnd());
 
-	if(replay)
+	if(replay && !shutdownFlag)
 	{
 		stats.replay_cnt++;
 		ds.device()->seek(startPos);
@@ -254,9 +257,15 @@ _startTransfers:
 	con->write_n(&shutdown, 1);
 
 	delete batchedTransfers;
+
+	if(shutdownFlag)
+	{
+		emit socketDisconnected();
+		con->close();
+	}
 }
 
-PS2ClientController::PS2ClientController(QString hostname)
+PS2ClientController::PS2ClientController()
 	: worker(&con)
 {
 	worker.moveToThread(&workerThread);
@@ -266,15 +275,18 @@ PS2ClientController::PS2ClientController(QString hostname)
 
 	workerThread.setObjectName("PS2Client Thread");
 	workerThread.start();
-
-	QMetaObject::invokeMethod(&worker, "connectSocket", Qt::BlockingQueuedConnection, Q_ARG(QString, hostname));
 }
 
 PS2ClientController::~PS2ClientController()
 {
-	con.close();
-	workerThread.terminate(); // :o
+	assert(1);
 }
+
+void PS2ClientController::connectSocket(QString hostname)
+{
+	QMetaObject::invokeMethod(&worker, "connectSocket", Qt::QueuedConnection, Q_ARG(QString, hostname));
+}
+
 
 void PS2ClientController::retrieveServerVersion()
 {

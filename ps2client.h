@@ -50,7 +50,7 @@ public:
 
 	bool replay;
 	Stats stats;
-
+	bool shutdownFlag = false;
 	tcp_connector* con;
 signals:
 	void retServerVersion(QString ver);
@@ -71,7 +71,7 @@ class PS2ClientController : public QObject
 
 public:
 
-	PS2ClientController(QString hostname);
+	PS2ClientController();
 	~PS2ClientController();
 	void retrieveServerVersion();
 	void setReplay(bool replay)
@@ -86,6 +86,11 @@ public:
 
 	void startDump(QString file);
 
+	void connectSocket(QString hostname);
+	void disconnectSocket()
+	{
+		worker.shutdownFlag = true;
+	};
 signals:
 	void socketDisconnected();
 	void socketConnected();

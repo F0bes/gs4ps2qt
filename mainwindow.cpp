@@ -19,9 +19,20 @@ MainWindow::MainWindow(QWidget* parent)
 	: QMainWindow(parent)
 	, ui(new Ui::MainWindow)
 	, workerTimer(new QTimer())
+	, ctrl(new PS2ClientController())
 {
 	ui->setupUi(this);
 	connect(workerTimer, &QTimer::timeout, this, &MainWindow::workerTimerStats);
+
+	connect(ctrl, &PS2ClientController::socketConnected, this, &MainWindow::socketConnected);
+	connect(ctrl, &PS2ClientController::socketDisconnected, this, &MainWindow::socketDisconnected);
+	connect(ctrl, &PS2ClientController::retServerVersion, this, [this](QString val) {
+		if(val.length() > 5)
+			ui->lblVersion->setText("Invalid\n");
+		else
+			ui->lblVersion->setText(val);
+	});
+	connect(ui->chkReplay, &QCheckBox::toggled, ctrl, &PS2ClientController::setReplay);
 }
 
 MainWindow::~MainWindow()
@@ -51,24 +62,14 @@ void MainWindow::btnConnect_Clicked()
 		return;
 	}
 
-	ctrl = new PS2ClientController(ui->txtHost->text());
-
-	connect(ctrl, &PS2ClientController::socketConnected, this, &MainWindow::socketConnected);
-	connect(ctrl, &PS2ClientController::socketDisconnected, this, &MainWindow::socketDisconnected);
-	connect(ctrl, &PS2ClientController::retServerVersion, this, [this](QString val) {
-		if(val.length() > 5)
-			ui->lblVersion->setText("Invalid\n");
-		else
-			ui->lblVersion->setText(val);
-	});
-	connect(ui->chkReplay, &QCheckBox::toggled, ctrl, &PS2ClientController::setReplay);
+	ctrl->connectSocket(ui->txtHost->text());
 
 	ui->lblState->setText("Connecting");
 }
 
 void MainWindow::btnDisconnect_Clicked()
 {
-	delete ctrl;
+	ctrl->disconnectSocket();
 }
 
 void MainWindow::btnBrowse_Clicked()
@@ -140,8 +141,6 @@ void MainWindow::screenshotWidget_Clicked()
 void MainWindow::socketDisconnected()
 {
 	workerTimer->stop();
-	if(ctrl != nullptr)
-		delete ctrl;
 	ui->lblState->setText("Not Connected");
 }
 
