@@ -33,3 +33,8 @@ jobs:
         working-directory: build
         run: cmake --build . --config Release --target install 
 
+      - name: Create the artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: gs4ps2qt
+          path: ${{github.workspace}}/release
