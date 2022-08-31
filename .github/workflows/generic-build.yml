@@ -31,10 +31,10 @@ jobs:
 
       - name: Package
         working-directory: build
-        run: cmake --build . --config Release --target install 
+        run: cmake --build . --config ${{env.BUILD_TYPE}} --target install 
 
       - name: Create the artifact
         uses: actions/upload-artifact@v2
         with:
           name: gs4ps2qt
-          path: ${{github.workspace}}/release
+          path: ${{github.workspace}}/release/gs4ps2qt

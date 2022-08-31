@@ -56,10 +56,6 @@ set_target_properties(gs4ps2qt PROPERTIES
     WIN32_EXECUTABLE FALSE
 )
 
-install(TARGETS gs4ps2qt
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(gs4ps2qt)
 endif()
@@ -72,13 +68,13 @@ endif()
 
 add_custom_command(
     TARGET gs4ps2qt POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/deploy
-    COMMAND $ENV{Qt6_DIR}/bin/windeployqt.exe ${BINARIES_TYPE} --compiler-runtime --dir ${CMAKE_BINARY_DIR}/deploy $<TARGET_FILE:gs4ps2qt>
+    COMMAND $ENV{Qt6_DIR}/bin/windeployqt.exe ${BINARIES_TYPE} --compiler-runtime --dir ${CMAKE_BINARY_DIR}/gs4ps2qt $<TARGET_FILE:gs4ps2qt>
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:gs4ps2qt> ${CMAKE_BINARY_DIR}/gs4ps2qt
 )
 
 install(
-    DIRECTORY ${CMAKE_BINARY_DIR}/deploy/
-    DESTINATION gs4ps2qt
+    DIRECTORY ${CMAKE_BINARY_DIR}/gs4ps2qt
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
     COMPONENT gs4ps2qt_component
 )
 
