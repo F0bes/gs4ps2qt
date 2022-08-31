@@ -63,3 +63,22 @@ install(TARGETS gs4ps2qt
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(gs4ps2qt)
 endif()
+
+if(CMAKE_BUILD_TYPE MATCHES Release)
+    set(BINARIES_TYPE --release)
+else()
+    set(BINARIES_TYPE --debug)
+endif()
+
+add_custom_command(
+    TARGET gs4ps2qt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/deploy
+    COMMAND $ENV{Qt6_DIR}/bin/windeployqt.exe ${BINARIES_TYPE} --compiler-runtime --dir ${CMAKE_BINARY_DIR}/deploy $<TARGET_FILE:gs4ps2qt>
+)
+
+install(
+    DIRECTORY ${CMAKE_BINARY_DIR}/deploy/
+    DESTINATION gs4ps2qt
+    COMPONENT gs4ps2qt_component
+)
+
