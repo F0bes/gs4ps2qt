@@ -27,11 +27,12 @@ MainWindow::MainWindow(QWidget* parent)
 	connect(ctrl, &PS2ClientController::socketConnected, this, &MainWindow::socketConnected);
 	connect(ctrl, &PS2ClientController::socketDisconnected, this, &MainWindow::socketDisconnected);
 	connect(ctrl, &PS2ClientController::retServerVersion, this, [this](QString val) {
-		if(val.length() > 5)
+		if (val.length() > 5)
 			ui->lblVersion->setText("Invalid\n");
 		else
 			ui->lblVersion->setText(val);
 	});
+	connect(ctrl, &PS2ClientController::frameReceived, this, &MainWindow::frameReceived);
 	connect(ui->chkReplay, &QCheckBox::toggled, ctrl, &PS2ClientController::setReplay);
 }
 
@@ -117,23 +118,28 @@ void MainWindow::listDumpFiles_itemClicked(QListWidgetItem* item)
 
 			memcpy(image.bits(), data.data() + header.screenshot_offset, header.screenshot_size);
 			// Remove the alpha channel
-			ui->screenshotWidget->setPixmap(QPixmap::fromImage(image.convertedTo(QImage::Format_RGB32)));
+			ui->lblDumpPreview->setPixmap(QPixmap::fromImage(image.convertedTo(QImage::Format_RGB32)));
 		}
 		else
 		{
-			ui->screenshotWidget->setPixmap(QPixmap(0, 0));
+			ui->lblDumpPreview->setPixmap(QPixmap(0, 0));
 		}
 	}
 }
 
 void MainWindow::listDumpFiles_itemDoubleClicked(QListWidgetItem* item)
 {
+	// Clear the frames
+	c1Pixmaps.clear();
+	c2Pixmaps.clear();
+	ui->listC1Frames->clear();
+	ui->listC2Frames->clear();
 	ctrl->startDump(ui->txtDumpPath->text() + "/" + item->text());
 }
 
 void MainWindow::screenshotWidget_Clicked()
 {
-	QPixmap pixmap = ui->screenshotWidget->pixmap();
+	QPixmap pixmap = ui->lblDumpPreview->pixmap();
 	ScreenshotDialog* dialog = new ScreenshotDialog(nullptr, pixmap);
 	dialog->exec();
 }
@@ -153,15 +159,111 @@ void MainWindow::socketConnected()
 
 void MainWindow::workerTimerStats()
 {
-	if(ctrl == nullptr)
+	if (ctrl == nullptr)
 		return;
 
 	auto workerStats = ctrl->fetchWorkerStats();
 
-	ui->lblTransferCntBatched->setText(QString::number(workerStats->trans_batched_cnt));
-	ui->lblTransferCntTotal->setText(QString::number(workerStats->trans_cnt));
-	ui->lblVsyncCnt->setText(QString::number(workerStats->vsync_cnt));
-	ui->lblFIFOCnt->setText(QString::number(workerStats->fifo_cnt));
-	ui->lblReplayCnt->setText(QString::number(workerStats->replay_cnt));
-	ui->lblPrivilegedSet->setText(QString::number(workerStats->reg_cnt));
+	QString status("TRANS (BATCHED): %0 | TRANS (TOTAL): %1 | VSYNC: %2 | FIFO: %3 | REPLAY: %4");
+	status = status.arg(workerStats->trans_batched_cnt).arg(workerStats->trans_cnt).arg(workerStats->vsync_cnt).arg(workerStats->fifo_cnt).arg(workerStats->replay_cnt);
+
+	ui->mainStatusBar->showMessage(status);
+}
+
+void MainWindow::frameReceived(PS2ClientWorker::Vsync_Frame frame, unsigned char* data)
+{
+	QImage image;
+	if (frame.PSM == 0)
+	{
+		image = QImage(frame.Width, frame.Height, QImage::Format_RGBA8888);
+	}
+	else if (frame.PSM == 1)
+	{
+		image = QImage(frame.Width, frame.Height, QImage::Format_RGB888);
+	}
+	else if (frame.PSM == 2)
+	{
+		image = QImage(frame.Width, frame.Height, QImage::Format_RGB16);
+	}
+
+	memcpy(image.bits(), data, frame.Bytes);
+	if (frame.Circuit == 1)
+	{
+		int frame_index = c1Pixmaps.size();
+		c1Pixmaps.emplace_back(QPixmap::fromImage(image.convertedTo(QImage::Format_RGB32)));
+		QByteArray frameData((char*)data, frame.Bytes);
+
+		QString frameInfoString("%0");
+		frameInfoString = frameInfoString.arg(QString::number(qChecksum(frameData), 16), 4);
+
+		QListWidgetItem* currentFrameItem = ui->listC1Frames->item(frame_index);
+		if (currentFrameItem == nullptr)
+			ui->listC1Frames->addItem(frameInfoString);
+		else
+			currentFrameItem->setText(frameInfoString);
+
+		if (ui->btnPreviewC1->isChecked())
+		{
+			frameChangedByUser = false;
+			ui->listC1Frames->setCurrentRow(frame_index);
+		}
+	}
+	else
+	{
+		int frame_index = c2Pixmaps.size();
+		c2Pixmaps.emplace_back(QPixmap::fromImage(image.convertedTo(QImage::Format_RGB32)));
+		QByteArray frameData((char*)data, frame.Bytes);
+
+		QString frameInfoString("%0");
+		frameInfoString = frameInfoString.arg(QString::number(qChecksum(frameData), 16), 4);
+
+		QListWidgetItem* currentFrameItem = ui->listC2Frames->item(frame_index);
+		if (currentFrameItem == nullptr)
+			ui->listC2Frames->addItem(frameInfoString);
+		else
+			currentFrameItem->setText(frameInfoString);
+
+		if (ui->btnPreviewC2->isChecked())
+		{
+			frameChangedByUser = false;
+			ui->listC2Frames->setCurrentRow(frame_index);
+		}
+	}
+
+
+	delete data;
+}
+
+void MainWindow::listFrame_currentItemChanged(QListWidgetItem* item)
+{
+	if (!frameChangedByUser)
+		frameChangedByUser = true;
+	else
+	{
+		ui->btnPreviewC1->setAutoExclusive(false);
+		ui->btnPreviewC1->setChecked(false);
+		ui->btnPreviewC1->setAutoExclusive(true);
+
+		ui->btnPreviewC2->setAutoExclusive(false);
+		ui->btnPreviewC2->setChecked(false);
+		ui->btnPreviewC2->setAutoExclusive(true);
+	}
+
+	QListWidget* caller = static_cast<QListWidget*>(sender());
+
+	// currentRow returns -1 on no selected item (the list widget is cleared)
+	if(caller->currentRow() < 0)
+	{
+		ui->lblCurrentFrameImg->setPixmap(QPixmap());
+		return;
+	}
+
+	if (caller == ui->listC1Frames)
+	{
+			ui->lblCurrentFrameImg->setPixmap(c1Pixmaps.at(ui->listC1Frames->currentRow()));
+	}
+	else
+	{
+		ui->lblCurrentFrameImg->setPixmap(c2Pixmaps.at(ui->listC2Frames->currentRow()));
+	}
 }

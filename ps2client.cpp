@@ -49,8 +49,8 @@ void PS2ClientWorker::cmdExecuteDump(QByteArray data)
 	GSDump::GSDumpHeader header = GSDump::ReadHeader(ds);
 	ds.skipRawData(header.serial_size);
 	ds.skipRawData(header.screenshot_size);
-	
-	if(!header.old)
+
+	if (!header.old)
 		ds.skipRawData(4); // skip state version
 
 	// Send state data
@@ -106,7 +106,7 @@ _sendRegisterData:
 	}
 
 	delete registers;
-	char* batchedTransfers = new char[0x400000];
+	char* batchedTransfers = new char[0x500000];
 _startTransfers:
 	uint32_t transfersBatched = 0;
 	uint32_t batchedSize = 0;
@@ -115,7 +115,7 @@ _startTransfers:
 	bool transKicked = false;
 	do
 	{
-		if(shutdownFlag)
+		if (shutdownFlag)
 			break;
 		// We don't have any peeking with QDataStream
 		// So when we kick we will have read the next tag
@@ -154,7 +154,7 @@ _startTransfers:
 
 					_sendTransferPacket:
 						qDebug() << "Sending batched packet of " << transfersBatched << "packets"
-						<< "of size " << batchedSize;
+								 << "of size " << batchedSize;
 						char cmd = SERVER_TRANSFER;
 						con->write_n(&cmd, 1);
 						con->write_n(&CRC, 1);
@@ -190,12 +190,45 @@ _startTransfers:
 				con->write_n(&cmd, 1);
 				con->write_n(&field, 1);
 
-				char response;
+				unsigned char response;
 				con->read_n(&response, 1);
 
 				if (response == SERVER_RETRY)
 				{
 					goto _sendVsync;
+				}
+				if (response == SERVER_OK_FRAME)
+				{
+					// We have framebuffer data
+					qDebug() << "Receiving framebuffer data";
+
+					uint32_t circuits;
+					con->read_n(&circuits, sizeof(circuits));
+
+read_circuit_data:
+					Vsync_Frame frame_header;
+					con->read_n(&frame_header.Circuit, sizeof(frame_header.Circuit));
+					con->read_n(&frame_header.PSM, sizeof(frame_header.PSM));
+					con->read_n(&frame_header.Width, sizeof(frame_header.Width));
+					con->read_n(&frame_header.Height, sizeof(frame_header.Height));
+					con->read_n(&frame_header.Bytes, sizeof(frame_header.Bytes));
+
+					qDebug() << frame_header.Circuit << " <-- received circuit";
+					unsigned char* frame = (unsigned char*)malloc(frame_header.Bytes);
+					con->read_n(frame, frame_header.Bytes);
+
+					emit frameReceived(frame_header, frame);
+					
+					if(circuits == 3) // We are reading 2 circuits
+					{ 
+						circuits = 0;
+						goto read_circuit_data;
+					}
+				}
+				else if (response != SERVER_OK)
+				{
+					qDebug() << "Panic";
+					abort();
 				}
 			}
 			break;
@@ -247,7 +280,7 @@ _startTransfers:
 		}
 	} while (!ds.atEnd());
 
-	if(replay && !shutdownFlag)
+	if (replay && !shutdownFlag)
 	{
 		stats.replay_cnt++;
 		ds.device()->seek(startPos);
@@ -256,9 +289,12 @@ _startTransfers:
 	unsigned char shutdown = SERVER_SHUTDOWN;
 	con->write_n(&shutdown, 1);
 
+	// Unused
+	con->read_n(&response, 1);
+
 	delete batchedTransfers;
 
-	if(shutdownFlag)
+	if (shutdownFlag)
 	{
 		emit socketDisconnected();
 		con->close();
@@ -272,7 +308,7 @@ PS2ClientController::PS2ClientController()
 	connect(&worker, &PS2ClientWorker::retServerVersion, this, &PS2ClientController::retServerVersion);
 	connect(&worker, &PS2ClientWorker::socketConnected, this, &PS2ClientController::socketConnected);
 	connect(&worker, &PS2ClientWorker::socketDisconnected, this, &PS2ClientController::socketDisconnected);
-
+	connect(&worker, &PS2ClientWorker::frameReceived, this, &PS2ClientController::frameReceived);
 	workerThread.setObjectName("PS2Client Thread");
 	workerThread.start();
 }
