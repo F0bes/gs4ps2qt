@@ -36,6 +36,9 @@ private slots:
 
 	void workerTimerStats();
 private:
+	void readSettings();
+	void writeSettings();
+
 	Ui::MainWindow *ui;
 
 	PS2ClientController* ctrl = nullptr;

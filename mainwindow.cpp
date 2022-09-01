@@ -34,11 +34,46 @@ MainWindow::MainWindow(QWidget* parent)
 	});
 	connect(ctrl, &PS2ClientController::frameReceived, this, &MainWindow::frameReceived);
 	connect(ui->chkReplay, &QCheckBox::toggled, ctrl, &PS2ClientController::setReplay);
+
+	readSettings();
 }
 
 MainWindow::~MainWindow()
 {
+	writeSettings();
 	delete ui;
+}
+
+void MainWindow::readSettings()
+{
+	QSettings settings("Fobes", "GS4PS2QT");
+
+	settings.beginGroup("MainWindow");
+	const auto geometry = settings.value("geometry", QByteArray()).toByteArray();
+	if (!geometry.isEmpty())
+		restoreGeometry(geometry);
+
+
+	const auto dumpPath = settings.value("dump-path", "").toString();
+	ui->txtDumpPath->setText(dumpPath);
+
+	const auto hostAddress = settings.value("host-address").toString();
+	ui->txtHost->setText(hostAddress);
+
+	const auto replay = settings.value("toggle-replay", true).toBool();
+	ui->chkReplay->setChecked(replay);
+}
+
+void MainWindow::writeSettings()
+{
+	QSettings settings("Fobes", "GS4PS2QT");
+
+	settings.beginGroup("MainWindow");
+
+	settings.setValue("geometry", saveGeometry());
+	settings.setValue("dump-path", ui->txtDumpPath->text());
+	settings.setValue("host-path", ui->txtHost->text());
+	settings.setValue("toggle-replay", ui->chkReplay->isChecked());
 }
 
 void MainWindow::chkUDPTTY_Changed(int state)
@@ -252,7 +287,7 @@ void MainWindow::listFrame_currentItemChanged(QListWidgetItem* item)
 	QListWidget* caller = static_cast<QListWidget*>(sender());
 
 	// currentRow returns -1 on no selected item (the list widget is cleared)
-	if(caller->currentRow() < 0)
+	if (caller->currentRow() < 0)
 	{
 		ui->lblCurrentFrameImg->setPixmap(QPixmap());
 		return;
@@ -260,7 +295,7 @@ void MainWindow::listFrame_currentItemChanged(QListWidgetItem* item)
 
 	if (caller == ui->listC1Frames)
 	{
-			ui->lblCurrentFrameImg->setPixmap(c1Pixmaps.at(ui->listC1Frames->currentRow()));
+		ui->lblCurrentFrameImg->setPixmap(c1Pixmaps.at(ui->listC1Frames->currentRow()));
 	}
 	else
 	{
