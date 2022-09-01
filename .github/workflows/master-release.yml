@@ -1,0 +1,60 @@
+name: master-release
+
+on:
+  push:
+    branches:
+      - "master"
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Increment our tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: master
+          custom_release_rules: "release:major:New release!"
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - run:
+            git fetch --tags
+
+      - name: Configure QT
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.2.*'
+          arch: 'win64_msvc2019_64'
+
+      - name: Configure CMake
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/release
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+      - name: Package
+        working-directory: build
+        run: cmake --build . --config ${{env.BUILD_TYPE}} --target install 
+
+      - name: Compress Package
+        uses: montudor/action-zip@v1
+        with:
+          args: zip -qq -r gs4ps2qt-${{steps.tag_version.outputs.new_tag }}.zip ${{github.workspace}}/release/gs4ps2qt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: steps.tag_version.outputs.new_tag
+        with:
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            gs4ps2qt-${{steps.tag_version.outputs.new_tag }}.zip
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
