@@ -72,7 +72,7 @@ void MainWindow::writeSettings()
 
 	settings.setValue("geometry", saveGeometry());
 	settings.setValue("dump-path", ui->txtDumpPath->text());
-	settings.setValue("host-path", ui->txtHost->text());
+	settings.setValue("host-address", ui->txtHost->text());
 	settings.setValue("toggle-replay", ui->chkReplay->isChecked());
 }
 
