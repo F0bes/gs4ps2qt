@@ -66,15 +66,17 @@ else()
     set(BINARIES_TYPE --debug)
 endif()
 
-add_custom_command(
-    TARGET gs4ps2qt POST_BUILD
-    COMMAND $ENV{Qt6_DIR}/bin/windeployqt.exe ${BINARIES_TYPE} --compiler-runtime --dir ${CMAKE_BINARY_DIR}/gs4ps2qt $<TARGET_FILE:gs4ps2qt>
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:gs4ps2qt> ${CMAKE_BINARY_DIR}/gs4ps2qt
-)
+if(WIN32)
+    add_custom_command(
+        TARGET gs4ps2qt POST_BUILD
+        COMMAND $ENV{Qt6_DIR}/bin/windeployqt.exe ${BINARIES_TYPE} --compiler-runtime --dir ${CMAKE_BINARY_DIR}/gs4ps2qt $<TARGET_FILE:gs4ps2qt>
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:gs4ps2qt> ${CMAKE_BINARY_DIR}/gs4ps2qt
+    )
+
 
 install(
     DIRECTORY ${CMAKE_BINARY_DIR}/gs4ps2qt
     DESTINATION ${CMAKE_INSTALL_PREFIX}
     COMPONENT gs4ps2qt_component
 )
-
+endif()
