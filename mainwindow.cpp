@@ -216,9 +216,10 @@ void MainWindow::frameReceived(PS2ClientWorker::Vsync_Frame frame, unsigned char
 	{
 		image = QImage(frame.Width, frame.Height, QImage::Format_RGB888);
 	}
-	else if (frame.PSM == 2)
+	else if (frame.PSM == 2 || frame.PSM == 10) // 16 and 16S
 	{
-		image = QImage(frame.Width, frame.Height, QImage::Format_RGB16);
+		// Don't think this is 100% right, but it gets the job done
+		image = QImage(frame.Width, frame.Height, QImage::Format_RGB555);
 	}
 
 	memcpy(image.bits(), data, frame.Bytes);
